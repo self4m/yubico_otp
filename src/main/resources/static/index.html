@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YubiKey OTP 验证系统</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            font-size: 14px;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .content-wrapper {
+            display: flex;
+            gap: 20px;
+            width: 100%;
+        }
+
+        .sidebar-panel {
+            background: rgba(255,255,255,0.95);
+            border-radius: 16px;
+            box-shadow: 0 18px 40px rgba(0,0,0,0.15);
+            border: 1px solid rgba(255,255,255,0.55);
+            padding: 24px 20px;
+            width: 240px;
+            height: 260px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .sidebar-title {
+            font-size: 13px;
+            letter-spacing: 0.16em;
+            color: #a1a8d2;
+            text-transform: uppercase;
+            font-weight: 600;
+            margin-bottom: 12px;
+            text-align: center;
+        }
+
+        .sidebar-item {
+            padding: 13px 16px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            color: #495057;
+            position: relative;
+            overflow: hidden;
+            background: #f5f6fb;
+            border: none;
+        }
+
+        .sidebar-item:hover {
+            background: #f8f9fa;
+            color: #667eea;
+        }
+
+        .sidebar-item.active {
+            background: linear-gradient(135deg, #667eea 0%, #7f6df2 100%);
+            color: white;
+            box-shadow: 0 8px 20px rgba(102,126,234,0.45);
+        }
+
+        .sidebar-item.active:hover {
+            background: #5a6fd8;
+        }
+
+        .sidebar-item::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            width: 3px;
+            background: #667eea;
+            transform: scaleY(0);
+            transition: transform 0.2s ease;
+        }
+
+        .sidebar-item.active::before {
+            transform: scaleY(1);
+            background: white;
+        }
+
+        .sidebar-item i {
+            margin-right: 12px;
+            font-size: 18px;
+            width: 24px;
+            text-align: center;
+        }
+
+        .main-content {
+            flex: 1;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.2em;
+            margin-bottom: 10px;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.2);
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+            display: none;
+        }
+
+        .card.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .card h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 1.6em;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+            font-size: 15px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 15px;
+            transition: all 0.2s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .form-group small {
+            display: block;
+            margin-top: 6px;
+            color: #666;
+            font-size: 13px;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 13px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 10px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: white;
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(17, 153, 142, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .alert {
+            padding: 16px;
+            border-radius: 8px;
+            margin-top: 20px;
+            display: none;
+            font-size: 15px;
+            position: relative;
+            border: 1px solid transparent;
+        }
+
+        .alert.show {
+            display: block;
+            animation: slideDown 0.3s ease;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .alert-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border-color: #bee5eb;
+        }
+
+        .response-details {
+            margin-top: 12px;
+            padding: 12px;
+            background: rgba(0,0,0,0.05);
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 13px;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* History records styles */
+        .history-card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 20px;
+            margin-top: 28px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+            animation: fadeIn 0.3s ease;
+        }
+
+        .history-card h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 1.6em;
+        }
+
+        .history-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 18px;
+        }
+
+        .clear-history-btn {
+            background: #f1f3f5;
+            color: #6c757d;
+            border: 1px solid #dee2e6;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .clear-history-btn:hover {
+            background: #e9ecef;
+        }
+
+        .history-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .history-item-title {
+            font-family: monospace;
+            font-size: 13px;
+            margin-bottom: 10px;
+            word-break: break-all;
+            color: #495057;
+        }
+
+        .history-item.success .history-item-title {
+            color: #1c7c43;
+        }
+
+        .history-item.error .history-item-title {
+            color: #6c757d;
+        }
+
+        .history-item-details {
+            font-family: monospace;
+            background: rgba(0,0,0,0.05);
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            white-space: pre-wrap;
+            word-break: break-all;
+            color: #212529;
+        }
+
+        .history-item.success .history-item-details {
+            color: #1c7c43;
+            background: rgba(40,167,69,0.12);
+        }
+
+        .history-item.error .history-item-details {
+            color: #6c757d;
+            background: rgba(108,117,125,0.12);
+        }
+
+        .empty-history {
+            text-align: center;
+            color: #868e96;
+            font-style: italic;
+            padding: 20px;
+            border: 1px dashed #dee2e6;
+            border-radius: 8px;
+            background: rgba(248,249,250,0.6);
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .container {
+                padding: 0 12px;
+            }
+
+            .content-wrapper {
+                flex-direction: column;
+            }
+
+            .sidebar-panel {
+                width: 100%;
+                height: auto;
+            }
+
+            .sidebar-item {
+                padding: 15px;
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>🔐 YubiKey OTP 验证系统</h1>
+        <p>硬件令牌注册与双因素认证</p>
+    </div>
+
+    <div class="content-wrapper">
+        <div class="sidebar-panel">
+            <div class="sidebar-title">操作面板</div>
+            <div class="sidebar">
+                <div class="sidebar-item active" data-target="verifyCard">
+                    <i>🔒</i> OTP验证
+                </div>
+                <div class="sidebar-item" data-target="serialCard">
+                    <i>🔢</i> 获取序列号
+                </div>
+                <div class="sidebar-item" data-target="registerCard">
+                    <i>📝</i> 设备注册
+                </div>
+            </div>
+        </div>
+
+        <div class="main-content">
+
+        <div class="card active" id="verifyCard">
+            <h2>OTP验证</h2>
+
+            <div class="alert alert-info show" style="margin-bottom: 20px;">
+                <strong>💡 提示：</strong>请确保使用与注册时相同的按键方式<br>
+                • <strong>短按</strong>（Slot 1）：轻触YubiKey按钮<br>
+                • <strong>长按</strong>（Slot 2）：长按YubiKey按钮2-3秒<br>
+                <small>如果注册时使用长按，验证时也必须使用长按；反之亦然。</small>
+            </div>
+
+            <form id="verifyForm">
+                <div class="form-group">
+                    <label for="verifyOtp">OTP *</label>
+                    <input type="text" id="verifyOtp" name="otp" required autofocus>
+                    <small>44位字符（按下YubiKey按钮自动输入）</small>
+                </div>
+
+                <button type="submit" class="btn btn-success" id="verifyBtn">
+                    验证OTP
+                </button>
+            </form>
+
+            <div id="verifyAlert" class="alert"></div>
+
+        </div>
+
+        <div class="card" id="serialCard">
+            <h2>获取序列号</h2>
+
+            <div class="alert alert-info show" style="margin-bottom: 20px;">
+                <strong>⚠️ 重要说明：</strong><br>
+                • 此功能<strong>仅适用于默认公开标识</strong>的YubiKey<br>
+                • 如果使用自定义的公开标识，将<strong>无法正确获取序列号</strong><br>
+                • 自定义公开标识与设备序列号无关联性，可能导致转换失败
+            </div>
+
+            <form id="serialForm">
+                <div class="form-group">
+                    <label for="serialOtp">OTP *</label>
+                    <input type="text" id="serialOtp" name="otp" required>
+                    <small>44位字符（按下YubiKey按钮自动输入）</small>
+                </div>
+
+                <button type="submit" class="btn btn-primary" id="serialBtn">
+                    获取序列号
+                </button>
+            </form>
+
+            <div id="serialAlert" class="alert"></div>
+        </div>
+
+        <div class="history-card" id="historyPanel">
+            <div class="history-header">
+                <h2>验证历史</h2>
+                <button class="clear-history-btn" id="clearHistoryBtn">清空</button>
+            </div>
+            <div class="history-list" id="historyList">
+                <div class="empty-history">暂无验证历史记录</div>
+            </div>
+        </div>
+
+        <div class="card" id="registerCard">
+            <h2>硬件设备注册</h2>
+
+            <div class="alert alert-info show" style="margin-bottom: 20px;">
+                <strong>💡 重要提示：</strong>YubiKey长按和短按是两个独立的配置<br>
+                • 如果需要同时使用两种按键方式，请分别注册<br>
+                • 注册时使用哪种按键方式，验证时就必须使用同样的方式
+            </div>
+
+            <form id="registerForm">
+                <div class="form-group">
+                    <label for="serialNumber">序列号 *</label>
+                    <input type="number" id="serialNumber" name="serial" required min="1">
+                    <small>硬件设备的序列号，必须大于等于1</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="publicIdentify">公开标识 *</label>
+                    <input type="text" id="publicIdentify" name="prefix" required>
+                    <small>12位字符，必须与OTP前12位一致</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="privateIdentify">私有标识 *</label>
+                    <input type="text" id="privateIdentify" name="uid" required>
+                    <small>12位十六进制字符</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="secretKey">AES密钥 *</label>
+                    <input type="text" id="secretKey" name="aeskey" required>
+                    <small>32位十六进制字符（16字节）</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="registerOtp">OTP *</label>
+                    <input type="text" id="registerOtp" name="otp" required>
+                    <small>44位字符（12位公开标识 + 32位Modhex密文）</small>
+                </div>
+
+                <button type="submit" class="btn btn-primary" id="registerBtn">
+                    注册硬件设备
+                </button>
+            </form>
+
+            <div id="registerAlert" class="alert"></div>
+        </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+    // 历史记录数组
+    let historyRecords = [];
+
+    const historyPanel = document.getElementById('historyPanel');
+
+    function escapeHtml(str = '') {
+        return str
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    // 切换卡片显示
+    function switchCard(targetId) {
+        // 隐藏所有卡片
+        document.querySelectorAll('.card').forEach(card => {
+            card.classList.remove('active');
+        });
+
+        // 显示目标卡片
+        document.getElementById(targetId).classList.add('active');
+
+        // 更新侧边栏激活状态
+        document.querySelectorAll('.sidebar-item').forEach(item => {
+            item.classList.remove('active');
+        });
+
+        // 激活对应的侧边栏项
+        document.querySelector(`[data-target="${targetId}"]`).classList.add('active');
+
+        // 只在OTP验证页面展示历史面板
+        if (historyPanel) {
+            historyPanel.style.display = targetId === 'verifyCard' ? 'block' : 'none';
+        }
+
+        // 切换到注册页时清空提示
+        if (targetId === 'registerCard') {
+            const registerAlert = document.getElementById('registerAlert');
+            registerAlert.className = 'alert';
+            registerAlert.innerHTML = '';
+        }
+
+        // 切换到获取序列号页时清空提示
+        if (targetId === 'serialCard') {
+            const serialAlert = document.getElementById('serialAlert');
+            serialAlert.className = 'alert';
+            serialAlert.innerHTML = '';
+        }
+    }
+
+    // 侧边栏点击事件
+    document.querySelectorAll('.sidebar-item').forEach(item => {
+        item.addEventListener('click', function() {
+            const targetId = this.getAttribute('data-target');
+            switchCard(targetId);
+        });
+    });
+
+    // 清空历史记录
+    function clearHistory() {
+        historyRecords = [];
+        renderHistory();
+    }
+
+    // 添加记录到历史
+    function addHistoryRecord(type, isSuccess, message, otp, details = null) {
+        const record = {
+            id: Date.now(),
+            timestamp: new Date().toISOString(),
+            type: type, // 'verify' 或 'register'
+            isSuccess: isSuccess,
+            message: message,
+            otp: otp,
+            details: details
+        };
+
+        // 添加到数组开头（最新记录在前）
+        historyRecords.unshift(record);
+
+        // 限制历史记录数量为10条
+        if (historyRecords.length > 10) {
+            historyRecords = historyRecords.slice(0, 10);
+        }
+
+        renderHistory();
+    }
+
+    // 渲染历史记录
+    function renderHistory() {
+        const historyList = document.getElementById('historyList');
+
+        if (historyRecords.length === 0) {
+            historyList.innerHTML = '<div class="empty-history">暂无验证历史记录</div>';
+            return;
+        }
+
+        historyList.innerHTML = '';
+
+        historyRecords.forEach(record => {
+            const historyItem = document.createElement('div');
+            historyItem.className = `history-item ${record.isSuccess ? 'success' : 'error'}`;
+
+            const safeOtp = escapeHtml(record.otp || '未知OTP');
+            const detailsString = record.details
+                ? (typeof record.details === 'string' ? record.details : JSON.stringify(record.details, null, 2))
+                : '';
+            const safeDetails = detailsString
+                ? `<div class="history-item-details">${escapeHtml(detailsString)}</div>`
+                : '<div class="history-item-details">暂无响应数据</div>';
+
+            historyItem.innerHTML = `
+                <div class="history-item-title">${safeOtp}</div>
+                ${safeDetails}
+            `;
+
+            historyList.appendChild(historyItem);
+        });
+    }
+
+    // 显示提示信息（不会自动消失）
+    function showAlert(elementId, type, message, details = null) {
+        const alert = document.getElementById(elementId);
+        alert.className = `alert alert-${type} show`;
+        alert.innerHTML = message;
+
+        if (details) {
+            alert.innerHTML += `<div class="response-details">${JSON.stringify(details, null, 2)}</div>`;
+        }
+    }
+
+    // 注册表单提交
+    document.getElementById('registerForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const btn = document.getElementById('registerBtn');
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="loading"></span>注册中...';
+
+        // 获取并清理输入数据
+        const formData = {
+            serial: parseInt(document.getElementById('serialNumber').value),
+            prefix: document.getElementById('publicIdentify').value.trim(),
+            uid: document.getElementById('privateIdentify').value.trim(),
+            aeskey: document.getElementById('secretKey').value.trim(),
+            otp: document.getElementById('registerOtp').value.trim()
+        };
+
+        // 验证输入长度
+        if (formData.prefix.length !== 12) {
+            showAlert('registerAlert', 'error', '❌ 公开标识长度必须为12位');
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+            return;
+        }
+
+        if (formData.uid.length !== 12) {
+            showAlert('registerAlert', 'error', '❌ 私有标识长度必须为12位');
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+            return;
+        }
+
+        if (formData.aeskey.length !== 32) {
+            showAlert('registerAlert', 'error', '❌ AES密钥长度必须为32位');
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+            return;
+        }
+
+        if (formData.otp.length !== 44) {
+            showAlert('registerAlert', 'error', '❌ OTP长度必须为44位');
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/v1/otp/upload', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(formData)
+            });
+
+            const result = await response.json();
+
+            if (response.ok && result.status === 'success') {
+                showAlert('registerAlert', 'success', '✅ 注册成功！设备已成功注册到系统。');
+                document.getElementById('registerForm').reset();
+            } else {
+                const errorMsg = `❌ 注册失败：${result.message || '未知错误'}`;
+                showAlert('registerAlert', 'error', errorMsg);
+            }
+        } catch (error) {
+            const errorMsg = `❌ 网络错误：${error.message}`;
+            showAlert('registerAlert', 'error', errorMsg);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    });
+
+    // 验证表单提交
+    document.getElementById('verifyForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const btn = document.getElementById('verifyBtn');
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="loading"></span>验证中...';
+
+        // 获取并清理输入数据
+        const formData = {
+            otp: document.getElementById('verifyOtp').value.trim()
+        };
+
+        // 验证输入长度
+        if (formData.otp.length !== 44) {
+            showAlert('verifyAlert', 'error', '❌ OTP长度必须为44位');
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/v1/otp/verify', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(formData)
+            });
+
+            const result = await response.json();
+
+            if (response.ok && result.status === 'success') {
+                showAlert('verifyAlert', 'success', '✅ 验证成功！OTP有效，身份验证通过。', result);
+                document.getElementById('verifyOtp').value = '';
+                document.getElementById('verifyOtp').focus();
+
+                // 添加到历史记录
+                addHistoryRecord('verify', true, '验证成功', formData.otp, result);
+            } else {
+                let errorMsg = `❌ 验证失败：${result.message || '未知错误'}`;
+
+                showAlert('verifyAlert', 'error', errorMsg, result);
+                document.getElementById('verifyOtp').value = '';
+                document.getElementById('verifyOtp').focus();
+
+                // 添加到历史记录
+                addHistoryRecord('verify', false, result.message || '验证失败', formData.otp, result);
+            }
+        } catch (error) {
+            const errorMsg = `❌ 网络错误：${error.message}`;
+            showAlert('verifyAlert', 'error', errorMsg);
+            document.getElementById('verifyOtp').value = '';
+            document.getElementById('verifyOtp').focus();
+
+            // 添加到历史记录
+            addHistoryRecord('verify', false, `网络错误: ${error.message}`, formData.otp);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    });
+
+    // 清空历史记录按钮事件
+    document.getElementById('clearHistoryBtn').addEventListener('click', clearHistory);
+
+    // 获取序列号表单提交
+    document.getElementById('serialForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const btn = document.getElementById('serialBtn');
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="loading"></span>查询中...';
+
+        // 获取并清理输入数据
+        const formData = {
+            otp: document.getElementById('serialOtp').value.trim()
+        };
+
+        // 验证输入长度
+        if (formData.otp.length !== 44) {
+            showAlert('serialAlert', 'error', '❌ OTP长度必须为44位');
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/v1/otp/getSerial', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(formData)
+            });
+
+            const result = await response.json();
+
+            if (response.ok && result.status === 'success') {
+                const successMsg = `✅ 获取成功！设备序列号：<strong>${result.data.serial}</strong> 十六进制设备序列号：<strong>${result.data.hex}</strong>`;
+                showAlert('serialAlert', 'success', successMsg);
+                document.getElementById('serialOtp').value = '';
+            } else {
+                const errorMsg = `❌ 获取失败：${result.message || '未知错误'}`;
+                showAlert('serialAlert', 'error', errorMsg, result);
+                document.getElementById('serialOtp').value = '';
+            }
+        } catch (error) {
+            const errorMsg = `❌ 网络错误：${error.message}`;
+            showAlert('serialAlert', 'error', errorMsg);
+            document.getElementById('serialOtp').value = '';
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    });
+
+    // 自动聚焦到OTP输入框（用于YubiKey快速输入）
+    document.querySelectorAll('input[name="otp"]').forEach(input => {
+        input.addEventListener('focus', function() {
+            this.select();
+        });
+    });
+
+    // 为所有输入框添加失去焦点时自动trim的功能
+    document.querySelectorAll('input').forEach(input => {
+        input.addEventListener('blur', function() {
+            // 只对文本类型的输入框进行处理
+            if (this.type === 'text') {
+                this.value = this.value.trim();
+            }
+        });
+    });
+
+    // 页面加载完成后自动聚焦到验证OTP输入框
+    window.addEventListener('load', function() {
+        document.getElementById('verifyOtp').focus();
+        // 不再从localStorage加载历史记录（刷新时自动消失）
+        renderHistory();
+    });
+</script>
+</body>
+</html>
